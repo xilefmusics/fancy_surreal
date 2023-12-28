@@ -27,8 +27,8 @@ impl Client {
         database: &str,
     ) -> Result<Self, Error> {
         let client = Surreal::new::<ws::Ws>(format!("{}:{}", host, port)).await?;
-        client.signin(Root { username, password }).await.unwrap();
-        client.use_ns(namespace).use_db(database).await.unwrap();
+        client.signin(Root { username, password }).await?;
+        client.use_ns(namespace).use_db(database).await?;
         Ok(Self {
             client,
             table: None,
