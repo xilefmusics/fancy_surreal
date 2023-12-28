@@ -11,6 +11,7 @@ pub struct Select {
     fields: String,
     condition: String,
     wrapper: Vec<(String, String)>,
+    order_by: String,
 }
 
 impl Select {
@@ -21,6 +22,7 @@ impl Select {
             fields: String::new(),
             condition: String::new(),
             wrapper: Vec::new(),
+            order_by: String::new(),
         };
         if let Some(owner) = owner {
             select.condition(&format!("owner == \"{}\"", owner))
@@ -69,6 +71,11 @@ impl Select {
         self.wrapper_js(&format!("return arguments[0].map(element => {})", function))
     }
 
+    pub fn order_by(mut self, field: &str) -> Self {
+        self.order_by = field.into();
+        self
+    }
+
     pub fn query_str(&self) -> String {
         let fields = if self.fields.len() > 0 {
             &self.fields
@@ -80,6 +87,10 @@ impl Select {
 
         if self.condition.len() > 0 {
             query = format!("{} WHERE {}", query, self.condition);
+        }
+
+        if self.order_by.len() > 0 {
+            query = format!("{} ORDER BY {}", query, self.order_by);
         }
 
         for wrapper in &self.wrapper {
