@@ -15,7 +15,7 @@ pub struct Select {
 }
 
 impl Select {
-    pub fn new(client: Surreal<Client>, table: String, owner: Option<String>) -> Self {
+    pub fn new(client: Surreal<Client>, table: String, owners: Vec<&str>) -> Self {
         let select = Self {
             client,
             table,
@@ -24,8 +24,18 @@ impl Select {
             wrapper: Vec::new(),
             order_by: String::new(),
         };
-        if let Some(owner) = owner {
-            select.condition(&format!("owner == \"{}\"", owner))
+
+        if owners.len() > 1 {
+            select.condition(&format!(
+                "owner in [{}]",
+                owners
+                    .iter()
+                    .map(|owner| format!("\"{}\"", owner))
+                    .collect::<Vec<String>>()
+                    .join(",")
+            ))
+        } else if owners.len() > 0 {
+            select.condition(&format!("owner == \"{}\"", owners[0]))
         } else {
             select
         }
@@ -97,6 +107,7 @@ impl Select {
             query = format!("{}{}{}", wrapper.0, query, wrapper.1);
         }
 
+        println!("{}", query);
         query + ";"
     }
 

@@ -56,8 +56,15 @@ impl Client {
         Ok(Select::new(
             self.client.clone(),
             self.get_table()?,
-            self.owner,
+            match &self.owner {
+                Some(owner) => vec![&owner],
+                None => vec![],
+            },
         ))
+    }
+
+    pub fn multi_owner_select(self, owners: Vec<&str>) -> Result<Select, Error> {
+        Ok(Select::new(self.client.clone(), self.get_table()?, owners))
     }
 
     fn get_table(&self) -> Result<String, Error> {
