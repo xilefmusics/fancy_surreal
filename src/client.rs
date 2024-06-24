@@ -11,13 +11,13 @@ use surrealdb::opt::auth::Root;
 use surrealdb::Surreal;
 
 #[derive(Debug, Clone)]
-pub struct Client {
+pub struct Client<'a> {
     client: Surreal<ws::Client>,
-    table: Option<String>,
-    owner: Option<String>,
+    table: Option<&'a str>,
+    owners: Vec<&'a str>,
 }
 
-impl Client {
+impl<'a> Client<'a> {
     pub async fn new(
         host: &str,
         port: u16,
@@ -32,72 +32,91 @@ impl Client {
         Ok(Self {
             client,
             table: None,
-            owner: None,
+            owners: vec![],
         })
     }
 
-    pub fn table(&self, table: &str) -> Self {
+    pub fn table(&self, table: &'a str) -> Self {
         Self {
             client: self.client.clone(),
-            table: Some(table.to_string()),
-            owner: self.owner.clone(),
+            table: Some(table),
+            owners: self.owners.clone(),
         }
     }
 
-    pub fn owner(&self, owner: &str) -> Self {
+    pub fn owner(&self, owner: &'a str) -> Self {
         Self {
             client: self.client.clone(),
             table: self.table.clone(),
-            owner: Some(owner.to_string()),
+            owners: vec![owner],
         }
     }
 
-    pub fn select(self) -> Result<Select, Error> {
+    pub fn owners(&self, owners: &[&'a str]) -> Self {
+        Self {
+            client: self.client.clone(),
+            table: self.table.clone(),
+            owners: owners.to_owned(),
+        }
+    }
+
+    pub fn select(self) -> Result<Select<'a>, Error> {
         Ok(Select::new(
             self.client.clone(),
             self.get_table()?,
-            match &self.owner {
-                Some(owner) => vec![&owner],
-                None => vec![],
-            },
+            self.owners,
         ))
     }
 
-    pub fn multi_owner_select(self, owners: Vec<&str>) -> Result<Select, Error> {
-        Ok(Select::new(self.client.clone(), self.get_table()?, owners))
+    fn get_table(&self) -> Result<&'a str, Error> {
+        self.table.ok_or(Error::new("table is none"))
     }
 
-    fn get_table(&self) -> Result<String, Error> {
-        self.table.clone().ok_or(Error::new("table is none"))
+    fn first_owner(&self) -> Option<String> {
+        self.owners.first().map(|owner| owner.to_string())
     }
 
     async fn authorized(&self, id: &str) -> Result<(), Error> {
-        if let Some(owner) = self.owner.clone() {
-            let table = self.get_table()?;
-            let mut response = self
-                .client
-                .query(format!(
-                    "count(SELECT id FROM {} WHERE id == {}:{}) == 1;",
-                    &table, &table, id,
-                ))
-                .query(format!(
+        if self.owners.len() == 0 {
+            return Ok(());
+        }
+
+        let table = self.get_table()?;
+        let mut response = self
+            .client
+            .query(format!(
+                "count(SELECT id FROM {} WHERE id == {}:{}) == 1;",
+                &table, &table, id,
+            ))
+            .query(if self.owners.len() > 1 {
+                format!(
+                    "count(SELECT id FROM {} WHERE id =={}:{} AND owner in [{}]) == 1;",
+                    &table,
+                    &table,
+                    id,
+                    self.owners
+                        .iter()
+                        .map(|owner| format!("\"{}\"", owner))
+                        .collect::<Vec<String>>()
+                        .join(","),
+                )
+            } else {
+                format!(
                     "count(SELECT id FROM {} WHERE id =={}:{} AND owner == \"{}\") == 1;",
-                    &table, &table, id, owner,
-                ))
-                .await?;
-            let exists: Vec<bool> = response.take(0)?;
-            if !exists[0] {
+                    &table, &table, id, self.owners[0],
+                )
+            })
+            .await?;
+        let exists: Vec<bool> = response.take(0)?;
+        if !exists[0] {
+            Ok(())
+        } else {
+            let authorized: Vec<bool> = response.take(1)?;
+            if authorized[0] {
                 Ok(())
             } else {
-                let authorized: Vec<bool> = response.take(1)?;
-                if authorized[0] {
-                    Ok(())
-                } else {
-                    Err(Error::new("not authorized"))
-                }
+                Err(Error::new("not authorized"))
             }
-        } else {
-            Ok(())
         }
     }
 
@@ -121,16 +140,16 @@ impl Client {
         let table = self.table.clone().ok_or(Error::new("no table given"))?;
         if let Some(id) = content.get_id() {
             self.client
-                .create((&table, id))
-                .content(Record::new(content, table.clone(), self.owner.clone()))
+                .create((table, id))
+                .content(Record::new(content, table.to_string(), self.first_owner()))
                 .await?
                 .map(|record: Record<T>| vec![record.content()])
                 .ok_or(Error::new("record is none"))
         } else {
             Ok(self
                 .client
-                .create(&table)
-                .content(Record::new(content, table, self.owner.clone()))
+                .create(table)
+                .content(Record::new(content, table.to_string(), self.first_owner()))
                 .await?
                 .into_iter()
                 .map(|record: Record<T>| record.content())
@@ -162,8 +181,8 @@ impl Client {
         let id = content.get_id().ok_or(Error::new("no id given"))?;
         self.authorized(&id).await?;
         self.client
-            .update((&table, id))
-            .content(Record::new(content, table, self.owner.clone()))
+            .update((table, id))
+            .content(Record::new(content, table.to_string(), self.first_owner()))
             .await?
             .map(|record: Record<T>| vec![record.content()])
             .ok_or(Error::new("record is none"))
@@ -193,7 +212,7 @@ impl Client {
         let id = content.get_id().ok_or(Error::new("no id given"))?;
         self.authorized(&id).await?;
         self.client
-            .delete((&table, id))
+            .delete((table, id))
             .await?
             .map(|record: Record<T>| vec![record.content()])
             .ok_or(Error::new("record is none"))

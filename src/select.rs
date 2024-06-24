@@ -5,17 +5,17 @@ use serde::Serialize;
 use surrealdb::engine::remote::ws::Client;
 use surrealdb::Surreal;
 
-pub struct Select {
+pub struct Select<'a> {
     client: Surreal<Client>,
-    table: String,
+    table: &'a str,
     fields: String,
     condition: String,
     wrapper: Vec<(String, String)>,
     order_by: String,
 }
 
-impl Select {
-    pub fn new(client: Surreal<Client>, table: String, owners: Vec<&str>) -> Self {
+impl<'a> Select<'a> {
+    pub fn new(client: Surreal<Client>, table: &'a str, owners: Vec<&str>) -> Self {
         let select = Self {
             client,
             table,
