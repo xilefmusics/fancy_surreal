@@ -10,22 +10,26 @@ pub struct Select<'a> {
     table: &'a str,
     fields: String,
     condition: String,
+    fetch: String,
     wrapper: Vec<(String, String)>,
     order_by: String,
 }
 
 impl<'a> Select<'a> {
-    pub fn new(client: Surreal<Client>, table: &'a str, owners: Vec<&str>) -> Self {
+    pub fn new(client: Surreal<Client>, table: &'a str, owners: Vec<String>) -> Self {
         let select = Self {
             client,
             table,
             fields: String::new(),
             condition: String::new(),
+            fetch: String::new(),
             wrapper: Vec::new(),
             order_by: String::new(),
         };
 
-        if owners.len() > 1 {
+        if owners.contains(&"admin".to_string()) {
+            select
+        } else if owners.len() > 1 {
             select.condition(&format!(
                 "owner in [{}]",
                 owners
@@ -64,6 +68,11 @@ impl<'a> Select<'a> {
         self
     }
 
+    pub fn fetch(mut self, field: &str) -> Self {
+        self.fetch = field.to_string();
+        self
+    }
+
     pub fn wrapper(mut self, wrapper: (&str, &str)) -> Self {
         self.wrapper.push((wrapper.0.into(), wrapper.1.into()));
         self
@@ -79,6 +88,13 @@ impl<'a> Select<'a> {
 
     pub fn wrapper_js_map(self, function: &str) -> Self {
         self.wrapper_js(&format!("return arguments[0].map(element => {})", function))
+    }
+
+    pub fn wrapper_js_map_unpack(self, function: &str) -> Self {
+        self.wrapper_js(&format!(
+            "return arguments[0].map(element => {})[0]",
+            function
+        ))
     }
 
     pub fn order_by(mut self, field: &str) -> Self {
@@ -99,6 +115,10 @@ impl<'a> Select<'a> {
             query = format!("{} WHERE {}", query, self.condition);
         }
 
+        if self.fetch.len() > 0 {
+            query = format!("{} FETCH {}", query, self.fetch);
+        }
+
         if self.order_by.len() > 0 {
             query = format!("{} ORDER BY {}", query, self.order_by);
         }
@@ -107,7 +127,6 @@ impl<'a> Select<'a> {
             query = format!("{}{}{}", wrapper.0, query, wrapper.1);
         }
 
-        println!("{}", query);
         query + ";"
     }
 
@@ -127,10 +146,14 @@ impl<'a> Select<'a> {
     pub async fn query_one<T: Serialize + DeserializeOwned + Databasable>(
         &self,
     ) -> Result<T, Error> {
-        Ok(self.query().await?.remove(0))
+        self.query()
+            .await?
+            .into_iter()
+            .next()
+            .ok_or(Error::FancySurreal("404 Not Found".into()))
     }
 
-    pub async fn query_direct<T: Serialize + DeserializeOwned>(&self) -> Result<Vec<T>, Error> {
+    pub async fn query_direct<T: DeserializeOwned>(&self) -> Result<Vec<T>, Error> {
         Ok(self
             .client
             .query(self.query_str())
@@ -138,7 +161,7 @@ impl<'a> Select<'a> {
             .take::<Vec<T>>(0)?)
     }
 
-    pub async fn query_direct_one<T: Serialize + DeserializeOwned>(&self) -> Result<T, Error> {
+    pub async fn query_direct_one<T: DeserializeOwned>(&self) -> Result<T, Error> {
         Ok(self.query_direct().await?.remove(0))
     }
 }

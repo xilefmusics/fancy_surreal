@@ -14,7 +14,7 @@ use surrealdb::Surreal;
 pub struct Client<'a> {
     client: Surreal<ws::Client>,
     table: Option<&'a str>,
-    owners: Vec<&'a str>,
+    owners: Vec<String>,
 }
 
 impl<'a> Client<'a> {
@@ -48,15 +48,15 @@ impl<'a> Client<'a> {
         Self {
             client: self.client.clone(),
             table: self.table.clone(),
-            owners: vec![owner],
+            owners: vec![owner.to_string()],
         }
     }
 
-    pub fn owners(&self, owners: &[&'a str]) -> Self {
+    pub fn owners(&self, owners: Vec<String>) -> Self {
         Self {
             client: self.client.clone(),
             table: self.table.clone(),
-            owners: owners.to_owned(),
+            owners,
         }
     }
 
@@ -78,6 +78,9 @@ impl<'a> Client<'a> {
 
     async fn authorized(&self, id: &str) -> Result<(), Error> {
         if self.owners.len() == 0 {
+            return Ok(());
+        }
+        if self.owners.contains(&"admin".to_string()) {
             return Ok(());
         }
 

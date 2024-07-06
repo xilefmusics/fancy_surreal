@@ -29,7 +29,7 @@ async fn multi_owners() -> Result<(), Error> {
 
     assert_eq!(
         db.table("multi_owners")
-            .owners(&vec!["owner_a", "owner_b"])
+            .owners(vec!["owner_a".to_string(), "owner_b".to_string()])
             .select()?
             .query::<SimpleDatabasable>()
             .await?,
