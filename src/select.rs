@@ -92,7 +92,7 @@ impl<'a> Select<'a> {
 
     pub fn wrapper_js_map_unpack(self, function: &str) -> Self {
         self.wrapper_js(&format!(
-            "return arguments[0].map(element => {})[0]",
+            "if (arguments[0].length > 0) {{return arguments[0].map(element => {})[0]}} else {{return []}}",
             function
         ))
     }
