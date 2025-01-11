@@ -4,6 +4,8 @@ use serde::{Deserialize, Serialize};
 #[cfg(test)]
 mod basic;
 #[cfg(test)]
+mod change;
+#[cfg(test)]
 mod multi_owners;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

@@ -1,7 +1,4 @@
-use crate::Databasable;
-use crate::Error;
-use crate::Record;
-use crate::Select;
+use crate::{Change, Databasable, Error, Record, Select};
 
 use futures::future::join_all;
 use serde::de::DeserializeOwned;
@@ -62,6 +59,14 @@ impl<'a> Client<'a> {
 
     pub fn select(self) -> Result<Select<'a>, Error> {
         Ok(Select::new(
+            self.client.clone(),
+            self.get_table()?,
+            self.owners,
+        ))
+    }
+
+    pub fn change(self) -> Result<Change<'a>, Error> {
+        Ok(Change::new(
             self.client.clone(),
             self.get_table()?,
             self.owners,
