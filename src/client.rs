@@ -141,7 +141,7 @@ impl<'a> Client<'a> {
             .collect())
     }
 
-    pub async fn create_one<T: Databasable + Serialize + DeserializeOwned>(
+    pub async fn create_one<T: Databasable + Serialize + DeserializeOwned + 'static>(
         &self,
         content: T,
     ) -> Result<Vec<T>, Error> {
@@ -165,7 +165,7 @@ impl<'a> Client<'a> {
         }
     }
 
-    pub async fn create<T: Databasable + Serialize + DeserializeOwned>(
+    pub async fn create<T: Databasable + Serialize + DeserializeOwned + 'static>(
         &self,
         content: Vec<T>,
     ) -> Result<Vec<T>, Error> {
@@ -181,22 +181,27 @@ impl<'a> Client<'a> {
             })
     }
 
-    pub async fn update_one<T: Databasable + Serialize + DeserializeOwned>(
+    pub async fn update_one<T: Databasable + Serialize + DeserializeOwned + Clone + 'static>(
         &self,
         content: T,
     ) -> Result<Vec<T>, Error> {
         let table = self.table.clone().ok_or(Error::new("no table given"))?;
         let id = content.get_id().ok_or(Error::new("no id given"))?;
         self.authorized(&id).await?;
-        self.client
+        Ok(self
+            .client
             .update((table, id))
-            .content(Record::new(content, table.to_string(), self.first_owner()))
+            .content(Record::new(
+                content.clone(),
+                table.to_string(),
+                self.first_owner(),
+            ))
             .await?
             .map(|record: Record<T>| vec![record.content()])
-            .ok_or(Error::new("record is none"))
+            .unwrap_or(self.create_one(content).await?))
     }
 
-    pub async fn update<T: Databasable + Serialize + DeserializeOwned>(
+    pub async fn update<T: Databasable + Serialize + DeserializeOwned + Clone + 'static>(
         &self,
         content: Vec<T>,
     ) -> Result<Vec<T>, Error> {
@@ -212,7 +217,7 @@ impl<'a> Client<'a> {
             })
     }
 
-    pub async fn delete_one<T: Databasable + Serialize + DeserializeOwned>(
+    pub async fn delete_one<T: Databasable + Serialize + DeserializeOwned + 'static>(
         &self,
         content: T,
     ) -> Result<Vec<T>, Error> {
@@ -226,7 +231,7 @@ impl<'a> Client<'a> {
             .ok_or(Error::new("record is none"))
     }
 
-    pub async fn delete<T: Databasable + Serialize + DeserializeOwned>(
+    pub async fn delete<T: Databasable + Serialize + DeserializeOwned + 'static>(
         &self,
         content: Vec<T>,
     ) -> Result<Vec<T>, Error> {

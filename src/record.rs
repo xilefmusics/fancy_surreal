@@ -1,8 +1,7 @@
 use crate::Databasable;
 
 use serde::{Deserialize, Serialize};
-use surrealdb::opt::RecordId;
-use surrealdb::sql::Id;
+use surrealdb::RecordId;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Record<T: Databasable + Serialize> {
@@ -16,10 +15,7 @@ impl<'de, T: Databasable + Serialize + Deserialize<'de>> Record<T> {
         Record {
             id: content.get_id().map(|id| {
                 content.set_id(None);
-                RecordId {
-                    tb: table,
-                    id: Id::String(id.to_string()),
-                }
+                RecordId::from_table_key(table, id.to_string())
             }),
             owner,
             content,
@@ -28,7 +24,7 @@ impl<'de, T: Databasable + Serialize + Deserialize<'de>> Record<T> {
 
     pub fn content(self) -> T {
         let mut content = self.content;
-        content.set_id(self.id.map(|id| id.id.to_string()));
+        content.set_id(self.id.map(|id| id.key().to_string()));
         content
     }
 }

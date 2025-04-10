@@ -61,25 +61,9 @@ async fn basic() {
     // update
     db.table("test_table")
         .owner("test_user")
-        .update(vec![
-            MyData {
-                id: Some("firstId".to_string()),
-                data: "firstDataUpdated".to_string(),
-            },
-            MyData {
-                id: Some("anotherId".to_string()),
-                data: "anotherData".to_string(),
-            },
-        ])
-        .await
-        .unwrap();
-
-    // delete
-    db.table("test_table")
-        .owner("test_user")
-        .delete(vec![MyData {
-            id: Some("anotherId".to_string()),
-            data: "anotherData".to_string(),
+        .update(vec![MyData {
+            id: Some("firstId".to_string()),
+            data: "firstDataUpdated".to_string(),
         }])
         .await
         .unwrap();
@@ -99,6 +83,16 @@ async fn basic() {
         .unwrap()
         .id("firstId")
         .query_one::<MyData>()
+        .await
+        .unwrap();
+
+    // delete
+    db.table("test_table")
+        .owner("test_user")
+        .delete(vec![MyData {
+            id: Some("firstId".to_string()),
+            data: "firstDataUpdated".to_string(),
+        }])
         .await
         .unwrap();
 
