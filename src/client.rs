@@ -181,14 +181,17 @@ impl<'a> Client<'a> {
             })
     }
 
-    pub async fn update_one<T: Databasable + Serialize + DeserializeOwned + Clone + 'static>(
+    pub async fn update_one<
+        T: Databasable + Serialize + DeserializeOwned + Clone + 'static + std::fmt::Debug,
+    >(
         &self,
         content: T,
     ) -> Result<Vec<T>, Error> {
         let table = self.table.clone().ok_or(Error::new("no table given"))?;
         let id = content.get_id().ok_or(Error::new("no id given"))?;
         self.authorized(&id).await?;
-        Ok(self
+
+        let update_result: Option<Record<T>> = self
             .client
             .update((table, id))
             .content(Record::new(
@@ -196,12 +199,19 @@ impl<'a> Client<'a> {
                 table.to_string(),
                 self.first_owner(),
             ))
-            .await?
-            .map(|record: Record<T>| vec![record.content()])
-            .unwrap_or(self.create_one(content).await?))
+            .await?;
+
+        let result = match update_result {
+            Some(record) => vec![record.content()],
+            None => self.create_one(content).await?,
+        };
+
+        Ok(result)
     }
 
-    pub async fn update<T: Databasable + Serialize + DeserializeOwned + Clone + 'static>(
+    pub async fn update<
+        T: Databasable + Serialize + DeserializeOwned + Clone + 'static + std::fmt::Debug,
+    >(
         &self,
         content: Vec<T>,
     ) -> Result<Vec<T>, Error> {
